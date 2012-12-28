@@ -1,0 +1,114 @@
+#!/usr/bin/env ruby
+require "rubygems"
+require "optparse"
+require "mechanize"
+require "json"
+require "uri"
+require "pp" # DELETE
+
+class Duolingo
+
+  # URLs & DOM identifiers; update if site layout changes
+  LOGIN_URL = "http://duolingo.com/login"
+  LOGIN_USERNAME = "login"
+  LOGIN_PASSWORD = "password"
+  VOCAB_URL = "http://duolingo.com/vocabularies"
+  MORE_VOCAB_URL = "http://duolingo.com/words"
+
+  def initialize(username, password)
+    @agent = Mechanize.new
+    @username = username
+    @password = password
+    @logged_in = false
+    @vocab_page = 0
+  end
+
+  def vocabulary
+    # TODO: specify language, instead of only using the default one
+    login!() if not @logged_in
+
+    vocab = {}
+    vocab_retrieved = 0
+    begin
+      vocab_info = get_vocabulary_page()
+      # okay to overwrite each time; should be constant for each call
+      total_vocab = vocab_info['vocab_count']
+
+      words = vocab_info['vocab']
+      vocab_retrieved += words.size
+      words.each do |word|
+        strength = word['forms_data'].collect { |x| x['strength'] }.max
+        vocab[word['lemma_value']] = strength
+      end
+    end while vocab_retrieved < total_vocab
+
+    vocab
+  end
+
+  private
+
+  def login!
+    # saves a cookie to the @agent
+    response = @agent.post(LOGIN_URL, {
+      LOGIN_USERNAME => @username,
+      LOGIN_PASSWORD => @password
+    })
+    if response.code != "200"
+      puts "ERROR: Could not log in.\n\n#{response.body}"
+      exit 1
+    end
+    @logged_in = true
+  end
+
+  def get_vocabulary_page
+    if @vocab_page == 0
+      response = @agent.get("#{VOCAB_URL}?#{timestamp}")
+    else
+      response = @agent.get("#{MORE_VOCAB_URL}?page=#{@vocab_page}&sort_by=last_seen&desc=false&_=#{timestamp}")
+    end
+    @vocab_page += 1
+    JSON.parse(response.body)
+  end
+
+  def timestamp
+    Time.now.to_i * 1000
+  end
+end
+
+def export_vocabulary!(vocab)
+  # TODO: implement ;)
+end
+
+# MAIN PROGRAM #################################################################
+
+if __FILE__ == $0
+  opts = {}
+  OptionParser.new do |args|
+    args.banner = "Usage: duolingo-export"
+    args.on_tail("-p", "--password PASS", "Duolingo password") do |arg|
+      opts[:password] = arg
+    end
+    args.on_tail("-u", "--username USER", "Duolingo username") do |arg|
+      opts[:username] = arg
+    end
+    args.on_tail("-h", "--help", "Show this help message") do
+      puts args
+      exit
+    end
+  end.parse!
+
+  if not opts[:username]
+    print "Duolingo username: "
+    opts[:username] = gets.chomp
+  end
+  if not opts[:password]
+    print "Password for Duolingo user #{opts[:username]}: "
+    opts[:password] = gets.chomp
+  end
+
+  duolingo = Duolingo.new(opts[:username], opts[:password])
+  vocab = duolingo.vocabulary()
+  pp vocab # DELETE
+  #export_vocabulary!(vocab)
+
+end
