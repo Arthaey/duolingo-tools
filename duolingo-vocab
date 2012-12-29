@@ -12,8 +12,7 @@ class Duolingo
   LOGIN_URL = "http://duolingo.com/login"
   LOGIN_USERNAME = "login"
   LOGIN_PASSWORD = "password"
-  VOCAB_URL = "http://duolingo.com/vocabularies"
-  MORE_VOCAB_URL = "http://duolingo.com/words"
+  VOCAB_URL = "http://duolingo.com/words"
 
   def initialize(username, password)
     @agent = Mechanize.new
@@ -61,11 +60,7 @@ class Duolingo
   end
 
   def get_vocabulary_page
-    if @vocab_page == 0
-      response = @agent.get("#{VOCAB_URL}?#{timestamp}")
-    else
-      response = @agent.get("#{MORE_VOCAB_URL}?page=#{@vocab_page}&sort_by=last_seen&desc=false&_=#{timestamp}")
-    end
+    response = @agent.get("#{VOCAB_URL}?page=#{@vocab_page}&sort_by=last_seen&desc=false&_=#{timestamp}")
     @vocab_page += 1
     JSON.parse(response.body)
   end
@@ -108,7 +103,9 @@ if __FILE__ == $0
 
   duolingo = Duolingo.new(opts[:username], opts[:password])
   vocab = duolingo.vocabulary()
-  pp vocab # DELETE
   #export_vocabulary!(vocab)
+
+  pp vocab.sort # DELETE
+  puts "Found #{vocab.size} vocabulary words." # DELETE
 
 end
